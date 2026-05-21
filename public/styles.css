@@ -147,6 +147,27 @@ h2 {
   font-size: 1.25rem;
 }
 
+/* 可编辑标题 */
+#chatTitle {
+  cursor: text;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin: 0 -6px;
+  transition: background 160ms ease;
+  outline: none;
+}
+
+#chatTitle:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+#chatTitle[contenteditable="true"] {
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 .status-dot {
   width: 10px;
   height: 10px;
@@ -206,11 +227,25 @@ h2 {
 }
 
 .conversation-item:hover,
-.conversation-row:hover .conversation-item,
-.conversation-row.is-active .conversation-item {
+.conversation-row:hover .conversation-item {
   border-color: transparent;
   background: var(--surface);
   box-shadow: 0 1px 2px rgba(60, 64, 67, 0.12);
+}
+
+.conversation-row.is-active .conversation-item {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  font-weight: 700;
+}
+
+:root[data-theme="dark"] .conversation-row.is-active .conversation-item {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .conversation-row.is-running .conversation-item::after {
@@ -229,13 +264,17 @@ h2 {
   min-width: 32px;
   height: 32px;
   min-height: 32px;
-  margin-left: -34px;
+  margin-left: 4px;
   border-color: transparent;
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  color: var(--muted);
+  background: transparent;
+  color: var(--danger);
   opacity: 0;
   padding: 0;
   pointer-events: none;
+  transition:
+    opacity 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
 }
 
 .conversation-row:hover .conversation-delete {
@@ -243,9 +282,10 @@ h2 {
   pointer-events: auto;
 }
 
-.conversation-delete:hover {
-  background: color-mix(in srgb, var(--danger) 14%, var(--surface));
-  color: var(--danger);
+.conversation-delete:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 18%, var(--surface)) !important;
+  color: var(--danger) !important;
+  transform: scale(1.1);
 }
 
 .settings {
@@ -419,6 +459,7 @@ input[type="range"] {
   font-size: 0.74rem;
   padding: 0 10px;
   opacity: 0;
+  transition: opacity 160ms ease;
 }
 
 .message.user:hover .message-edit {
@@ -427,6 +468,59 @@ input[type="range"] {
 
 .message-edit:hover {
   color: var(--accent);
+}
+
+/* 行内编辑状态 */
+.message.is-editing .message-body textarea.inline-edit {
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--accent);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--accent-soft) 60%, var(--surface));
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.68;
+  min-height: 80px;
+  padding: 12px 16px;
+  resize: vertical;
+  box-shadow: none;
+  outline: none;
+}
+
+.message.is-editing .message-body textarea.inline-edit:focus {
+  border-color: var(--accent);
+  box-shadow: none;
+}
+
+.inline-edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.inline-edit-actions .btn-update {
+  min-height: 32px;
+  font-size: 0.82rem;
+  padding: 0 14px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.inline-edit-actions .btn-cancel {
+  min-height: 32px;
+  font-size: 0.82rem;
+  padding: 0 14px;
+  background: transparent;
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.inline-edit-actions .btn-cancel:hover:not(:disabled) {
+  background: var(--surface-strong);
+  color: var(--ink);
 }
 
 .message-body {

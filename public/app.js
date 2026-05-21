@@ -630,7 +630,7 @@ function extractUploadedFileContext(content) {
 }
 
 function setEditingLabel(isEditing) {
-  sendButton.querySelector("span").textContent = isEditing ? "Update" : "Send";
+  // no-op: editing is now inline in the message bubble
 }
 
 function startEditMessage(messageId) {
@@ -638,20 +638,91 @@ function startEditMessage(messageId) {
   const index = conversation.messages.findIndex((message) => message.id === messageId && message.role === "user");
   if (index === -1 || controllers.has(conversation.id)) return;
 
+  // Cancel any existing inline edit first
+  document.querySelectorAll(".message.is-editing").forEach((el) => cancelInlineEdit(el));
+
   const message = conversation.messages[index];
-  editingState = {
-    conversationId: conversation.id,
-    messageId,
-    index,
-    retainedFiles: message.files || [],
-    retainedFileContext: extractUploadedFileContext(message.content || "")
-  };
-  pendingFiles = [];
-  promptInput.value = message.displayContent || message.content || "";
-  autoResizePrompt();
-  renderAttachments();
-  setEditingLabel(true);
-  promptInput.focus();
+  const node = document.querySelector(`[data-message-id="${messageId}"]`);
+  if (!node) return;
+
+  node.classList.add("is-editing");
+
+  const body = node.querySelector(".message-body");
+  const originalText = message.displayContent || message.content || "";
+
+  // Replace body content with textarea
+  body.innerHTML = "";
+  const textarea = document.createElement("textarea");
+  textarea.className = "inline-edit";
+  textarea.value = originalText;
+  textarea.rows = Math.max(3, originalText.split("\n").length);
+  body.appendChild(textarea);
+
+  // Add action buttons
+  const actions = document.createElement("div");
+  actions.className = "inline-edit-actions";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "btn-cancel";
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.addEventListener("click", () => {
+    cancelInlineEdit(node);
+    // Re-render just this message
+    const msgData = getActiveConversation().messages.find((m) => m.id === messageId);
+    if (msgData) {
+      body.innerHTML = "";
+      const text = document.createElement("div");
+      text.className = "message-text";
+      text.textContent = msgData.displayContent || msgData.content || "";
+      body.appendChild(text);
+      if (msgData.files?.length) renderFileCards(body, msgData.files, false);
+    }
+  });
+
+  const updateBtn = document.createElement("button");
+  updateBtn.type = "button";
+  updateBtn.className = "btn-update";
+  updateBtn.textContent = "Update";
+  updateBtn.addEventListener("click", async () => {
+    const newText = textarea.value.trim();
+    if (!newText) return;
+
+    cancelInlineEdit(node);
+
+    const retainedFileContext = extractUploadedFileContext(message.content || "");
+    const retainedFiles = message.files || [];
+    const content = await buildUserPromptContent(newText, [], retainedFileContext);
+
+    conversation.messages.splice(index, conversation.messages.length - index, {
+      id: messageId,
+      role: "user",
+      content,
+      displayContent: newText,
+      files: retainedFiles
+    });
+    conversation.title = "New chat";
+    conversation.titleGenerated = false;
+    conversation.updatedAt = Date.now();
+    editingState = null;
+    pendingFiles = [];
+    saveState();
+    renderAll();
+    await sendMessage();
+  });
+
+  actions.appendChild(cancelBtn);
+  actions.appendChild(updateBtn);
+  node.appendChild(actions);
+
+  textarea.focus();
+  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+}
+
+function cancelInlineEdit(node) {
+  node.classList.remove("is-editing");
+  const actions = node.querySelector(".inline-edit-actions");
+  if (actions) actions.remove();
 }
 
 function updateAssistantMessage(conversationId, assistant) {
@@ -1013,6 +1084,47 @@ exportButton.addEventListener("click", () => {
   link.download = `nim-chats-${Date.now()}.json`;
   link.click();
   URL.revokeObjectURL(url);
+});
+
+// 双击标题可编辑
+chatTitle.addEventListener("dblclick", () => {
+  const conversation = getActiveConversation();
+  chatTitle.contentEditable = "true";
+  chatTitle.focus();
+  // 选中全部文字
+  const range = document.createRange();
+  range.selectNodeContents(chatTitle);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+});
+
+chatTitle.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    chatTitle.blur();
+  }
+  if (event.key === "Escape") {
+    // 恢复原标题
+    const conversation = getActiveConversation();
+    chatTitle.textContent = conversation.title || "New chat";
+    chatTitle.contentEditable = "false";
+  }
+});
+
+chatTitle.addEventListener("blur", () => {
+  if (chatTitle.contentEditable !== "true") return;
+  chatTitle.contentEditable = "false";
+  const newTitle = chatTitle.textContent.trim();
+  const conversation = getActiveConversation();
+  if (newTitle) {
+    conversation.title = newTitle;
+    conversation.titleGenerated = true;
+    saveState();
+    renderConversationList();
+  } else {
+    chatTitle.textContent = conversation.title || "New chat";
+  }
 });
 
 themeButton.addEventListener("click", cycleTheme);
