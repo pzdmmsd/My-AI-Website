@@ -2,7 +2,7 @@
 
 一个部署到 Cloudflare Pages 的 NVIDIA NIM 聊天网页。前端只访问同源 `/api/chat`，NVIDIA API key 保存在 Cloudflare Secret 中。
 
-## 本地运行
+## 本地运行 
 
 1. 安装依赖：
 
