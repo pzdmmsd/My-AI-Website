@@ -100,74 +100,21 @@ async function fetchModelIds(endpoint, apiKey) {
   return [...new Set((payload.data || []).map((item) => item.id).filter(Boolean))].sort();
 }
 
-async function verifyModel(endpoint, apiKey, model) {
-  const response = await fetch(`${endpoint}/chat/completions`, {
-    method: "POST",
-    signal: AbortSignal.timeout(12000),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      Accept: "application/json"
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: "Reply with ok." }],
-      max_tokens: 1,
-      temperature: 0,
-      stream: false
-    })
-  });
-
-  return response.ok;
-}
-
-async function verifyModels(endpoint, apiKey, models) {
-  const verified = [];
-  const failures = [];
-  let index = 0;
-  const workerCount = Math.min(6, models.length);
-
-  async function worker() {
-    while (index < models.length) {
-      const model = models[index];
-      index += 1;
-      try {
-        if (await verifyModel(endpoint, apiKey, model)) {
-          verified.push(model);
-        } else {
-          failures.push(model);
-        }
-      } catch {
-        failures.push(model);
-      }
-    }
-  }
-
-  await Promise.all(Array.from({ length: workerCount }, worker));
-  return {
-    verified: verified.sort(),
-    failures: failures.sort()
-  };
-}
-
 export async function refreshModelCache(request, env) {
   const endpoint = baseUrl(env);
   const listedModels = await fetchModelIds(endpoint, env.NVIDIA_API_KEY);
-  const candidates = listedModels.filter(isLikelyChatModel);
-  const { verified, failures } = await verifyModels(endpoint, env.NVIDIA_API_KEY, candidates);
-  const models = verified.length ? verified : fallbackModels;
+  const models = listedModels.filter(isLikelyChatModel);
   const preferredDefault = defaultModel(env);
 
   const payload = {
-    models,
+    models: models.length ? models : fallbackModels,
     default_model: models.includes(preferredDefault) ? preferredDefault : models[0] || preferredDefault,
     listed_count: listedModels.length,
-    candidate_count: candidates.length,
-    verified_count: verified.length,
-    rejected_count: listedModels.length - verified.length,
-    rejected_models: failures,
+    candidate_count: models.length,
+    verified_count: models.length,
+    rejected_count: listedModels.length - models.length,
     checked_at: new Date().toISOString(),
-    source: verified.length ? "nvidia-verified-cache" : "fallback"
+    source: models.length ? "nvidia-listed" : "fallback"
   };
 
   await writeCachedModels(request, payload);
