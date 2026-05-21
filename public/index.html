@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NVIDIA NIM Chat</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <div>
+            <p class="eyebrow">NVIDIA NIM</p>
+            <h1>Chats</h1>
+          </div>
+        </div>
+
+        <button class="new-chat" id="newChatButton" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          <span>New chat</span>
+        </button>
+        <nav class="conversation-list" id="conversationList" aria-label="Conversations"></nav>
+
+        <section class="settings" aria-label="Settings">
+          <label>
+            <span>Model</span>
+            <select id="modelSelect"></select>
+          </label>
+
+          <label>
+            <span>System prompt</span>
+            <textarea id="systemInput" rows="4">You are a precise, direct, helpful AI assistant.</textarea>
+          </label>
+
+          <label>
+            <span>App password</span>
+            <input id="passwordInput" type="password" autocomplete="current-password" placeholder="Optional" />
+          </label>
+
+          <label>
+            <span>Temperature <output id="temperatureValue">0.3</output></span>
+            <input id="temperatureInput" type="range" min="0" max="1.5" step="0.1" value="0.3" />
+          </label>
+
+          <label>
+            <span>Max output</span>
+            <input id="maxTokensInput" type="number" min="1" step="1" placeholder="No limit" />
+          </label>
+        </section>
+
+        <div class="sidebar-actions">
+          <button id="themeButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7.5 7.5 0 1 0 7.5 7.5A6 6 0 0 1 12 3Z" /></svg>
+            <span>Theme</span>
+          </button>
+          <button id="exportButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" /></svg>
+            <span>Export</span>
+          </button>
+        </div>
+      </aside>
+
+      <section class="chat-pane" aria-label="Chat">
+        <header class="chat-header">
+          <div>
+            <p class="eyebrow" id="activeModelLabel">Model</p>
+            <h2 id="chatTitle">New chat</h2>
+          </div>
+          <button id="stopButton" type="button" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h7a5 5 0 0 1 0 10H8m0 0 4-4m-4 4 4 4" /></svg>
+            <span>Stop</span>
+          </button>
+        </header>
+
+        <div class="messages" id="messages" aria-live="polite"></div>
+
+        <form class="composer" id="chatForm">
+          <div class="attachment-row" id="attachmentRow" hidden></div>
+          <div class="composer-main">
+            <input id="fileInput" type="file" multiple hidden />
+            <button class="icon-button" id="attachButton" type="button" title="Upload files" aria-label="Upload files">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 12.5-8.8 8.8a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 1 1-2.8-2.8l8.5-8.5" /></svg>
+              <span>Files</span>
+            </button>
+            <button class="icon-button" id="webModeButton" type="button" aria-pressed="false" title="Web mode">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM3.6 9h16.8M3.6 15h16.8M12 3c2 2.4 3 5.4 3 9s-1 6.6-3 9M12 3c-2 2.4-3 5.4-3 9s1 6.6 3 9" /></svg>
+              <span>Web</span>
+            </button>
+            <textarea id="promptInput" rows="1" placeholder="Message NVIDIA NIM"></textarea>
+            <button id="sendButton" type="submit">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-7 14-2-5-5-2Z" /></svg>
+              <span>Send</span>
+            </button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <template id="messageTemplate">
+      <article class="message">
+        <div class="message-meta"></div>
+        <div class="message-body"></div>
+      </article>
+    </template>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

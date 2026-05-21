@@ -1,0 +1,7 @@
+name = "nvidia-nim-chat-site"
+compatibility_date = "2026-05-21"
+pages_build_output_dir = "public"
+
+[vars]
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+NVIDIA_MODEL = "google/gemma-4-31b-it"
