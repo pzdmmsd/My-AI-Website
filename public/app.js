@@ -929,12 +929,12 @@ async function maybeGenerateTitle(conversation) {
       body: JSON.stringify({
         model: conversation.model || modelSelect.value,
         stream: false,
-        max_tokens: 32,
+        max_tokens: 20,
         temperature: 0.2,
         messages: [
           {
             role: "system",
-            content: "Generate a concise chat title in the same language as the user. Use 6 to 14 words. Return only the title."
+            content: "Generate a concise chat title in the same language as the user. Use 4 to 8 words maximum. Return only the title, no punctuation at the end."
           },
           {
             role: "user",
@@ -947,7 +947,10 @@ async function maybeGenerateTitle(conversation) {
     const payload = await response.json();
     const title = payload.choices?.[0]?.message?.content?.replace(/^["']|["']$/g, "").trim();
     if (title) {
-      conversation.title = title.length > 60 ? `${title.slice(0, 60)}...` : title;
+      // 限制最多10个词
+      const words = title.split(/\s+/);
+      const trimmed = words.length > 10 ? words.slice(0, 10).join(" ") : title;
+      conversation.title = trimmed;
       conversation.titleGenerated = true;
       if (state.activeId === conversation.id) chatTitle.textContent = conversation.title;
     }
