@@ -284,6 +284,14 @@ function setSidebarDrawer(open) {
   sidebarPinnedOpen = open;
   appShell.classList.toggle("is-sidebar-open", open);
   sidebarToggle?.setAttribute("aria-expanded", open ? "true" : "false");
+  sidebarToggle?.setAttribute("aria-label", open ? "Collapse sidebar" : "Open sidebar");
+  sidebarToggle?.setAttribute("title", open ? "Collapse sidebar" : "Open sidebar");
+  const icon = sidebarToggle?.querySelector("svg");
+  if (icon) {
+    icon.innerHTML = open
+      ? '<path d="M4 5h16v14H4zM9 5v14M15 9l-3 3 3 3" />'
+      : '<path d="M4 5h16v14H4zM9 5v14M13 9l3 3-3 3" />';
+  }
 }
 
 function closeSidebarDrawer() {
@@ -736,7 +744,6 @@ function renderConversationList() {
       modelSelect.value = conversation.model || state.settings.model || modelSelect.value;
       saveState();
       renderAll();
-      closeSidebarDrawer();
     });
 
     const deleteButton = document.createElement("button");
