@@ -20,6 +20,9 @@ const webModeButton = document.querySelector("#webModeButton");
 const fileInput = document.querySelector("#fileInput");
 const attachmentRow = document.querySelector("#attachmentRow");
 const settingsPanel = document.querySelector("#settingsPanel");
+const appShell = document.querySelector("#appShell");
+const sidebarToggle = document.querySelector("#sidebarToggle");
+const sidebarBackdrop = document.querySelector("#sidebarBackdrop");
 
 const storageKey = "nim-chat-state-v3";
 const TOKEN_KEY = "nim-session-token";
@@ -39,6 +42,7 @@ let editingState = null;
 let currentSession = null;
 let isHydratingState = false;
 let remoteSaveTimer = null;
+let sidebarPinnedOpen = !window.matchMedia("(max-width: 860px)").matches;
 
 function createInitialState() {
   const id = crypto.randomUUID();
@@ -236,7 +240,21 @@ function cycleTheme() {
 
 function syncSettingsDisclosure() {
   if (!settingsPanel) return;
-  settingsPanel.open = !window.matchMedia("(max-width: 760px)").matches;
+  settingsPanel.open = !window.matchMedia("(max-width: 860px)").matches;
+}
+
+function setSidebarDrawer(open) {
+  sidebarPinnedOpen = open;
+  appShell.classList.toggle("is-sidebar-open", open);
+  sidebarToggle?.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function closeSidebarDrawer() {
+  setSidebarDrawer(false);
+}
+
+function toggleSidebarDrawer() {
+  setSidebarDrawer(!appShell.classList.contains("is-sidebar-open"));
 }
 
 function syncRunState() {
@@ -667,6 +685,7 @@ function renderConversationList() {
       modelSelect.value = conversation.model || state.settings.model || modelSelect.value;
       saveState();
       renderAll();
+      closeSidebarDrawer();
     });
 
     const deleteButton = document.createElement("button");
@@ -1181,6 +1200,7 @@ newChatButton.addEventListener("click", () => {
   pendingFiles = [];
   saveState();
   renderAll();
+  closeSidebarDrawer();
 });
 
 exportButton.addEventListener("click", () => {
@@ -1261,12 +1281,19 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
   if (state.theme === "system") applyTheme("system");
 });
 
-const mobileSettingsQuery = window.matchMedia("(max-width: 760px)");
-mobileSettingsQuery.addEventListener("change", syncSettingsDisclosure);
+const mobileSettingsQuery = window.matchMedia("(max-width: 860px)");
+mobileSettingsQuery.addEventListener("change", () => {
+  syncSettingsDisclosure();
+  setSidebarDrawer(!mobileSettingsQuery.matches);
+});
+sidebarToggle?.addEventListener("click", toggleSidebarDrawer);
+sidebarBackdrop?.addEventListener("click", closeSidebarDrawer);
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeSidebarDrawer();
+});
 
 // ── Auth & boot ──────────────────────────────────────────────
 const loginOverlay = document.getElementById("loginOverlay");
-const appShell    = document.getElementById("appShell");
 const loginForm   = document.getElementById("loginForm");
 const loginError  = document.getElementById("loginError");
 const loginBtn    = document.getElementById("loginBtn");
@@ -1289,6 +1316,7 @@ function showLogin() {
   currentSession = null;
   clearTimeout(remoteSaveTimer);
   remoteSaveTimer = null;
+  closeSidebarDrawer();
   appShell.hidden = true;
   loginOverlay.hidden = false;
 }
@@ -1359,4 +1387,5 @@ logoutButton.addEventListener("click", async () => {
 adminPanelBtn.addEventListener("click", () => { location.href = "/admin.html"; });
 
 syncSettingsDisclosure();
+setSidebarDrawer(sidebarPinnedOpen);
 boot();

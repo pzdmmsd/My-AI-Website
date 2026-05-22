@@ -98,11 +98,15 @@ button svg {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: 0 minmax(0, 1fr);
   height: 100dvh;
   max-height: 100dvh;
   min-height: 0;
   overflow: hidden;
+}
+
+.app-shell.is-sidebar-open {
+  grid-template-columns: 320px minmax(0, 1fr);
 }
 
 .sidebar {
@@ -113,6 +117,14 @@ button svg {
   padding: 18px 14px 12px;
   border-right: 1px solid var(--line);
   background: var(--sidebar);
+  overflow: hidden;
+  transform: translateX(-100%);
+  transition: transform 220ms ease;
+}
+
+.app-shell.is-sidebar-open .sidebar {
+  overflow: visible;
+  transform: translateX(0);
 }
 
 .sidebar-top,
@@ -454,6 +466,29 @@ input[type="range"] {
   backdrop-filter: blur(14px);
 }
 
+.sidebar-backdrop {
+  display: none;
+}
+
+.sidebar-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  border-color: var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0;
+}
+
+.sidebar-toggle:hover:not(:disabled) {
+  background: var(--surface-strong);
+  transform: none;
+}
+
 .chat-title-wrap {
   min-width: 0;
   flex: 1;
@@ -477,6 +512,16 @@ input[type="range"] {
   overscroll-behavior: contain;
   padding: 22px;
   scroll-behavior: smooth;
+}
+
+.app-shell:not(.is-sidebar-open) .messages,
+.app-shell:not(.is-sidebar-open) .composer {
+  width: min(100%, 980px);
+  margin-inline: auto;
+}
+
+.app-shell:not(.is-sidebar-open) .chat-header {
+  padding-inline: max(22px, calc((100vw - 980px) / 2 + 22px));
 }
 
 .empty-state {
@@ -894,19 +939,47 @@ input[type="range"] {
 
   .app-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     height: 100dvh;
     min-height: 0;
   }
 
   .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 120;
+    width: min(330px, 86vw);
     grid-template-rows: auto auto auto auto auto;
-    gap: 10px;
-    max-height: 44dvh;
-    padding: 12px;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+    gap: 12px;
+    height: 100dvh;
+    max-height: none;
+    padding: 16px 14px calc(14px + env(safe-area-inset-bottom));
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
     overflow-y: auto;
+    box-shadow: 12px 0 34px rgba(0, 0, 0, 0.22);
+    transform: translateX(-105%);
+    transition: transform 220ms ease;
+  }
+
+  .app-shell.is-sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 110;
+    display: block;
+    background: rgba(15, 17, 21, 0.42);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease;
+  }
+
+  .app-shell.is-sidebar-open .sidebar-backdrop {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .sidebar-top h1 {
@@ -919,17 +992,17 @@ input[type="range"] {
 
   .conversation-list {
     display: flex;
-    flex-direction: row;
-    gap: 8px;
-    min-height: 44px;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
     max-height: none;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding: 2px 0 6px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 4px 2px 4px 4px;
   }
 
   .conversation-row {
-    flex: 0 0 clamp(150px, 42vw, 220px);
+    flex: 0 0 auto;
   }
 
   .conversation-item {
@@ -985,12 +1058,13 @@ input[type="range"] {
   }
 
   .chat-pane {
-    height: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
     min-height: 0;
   }
 
   .chat-header {
-    padding: 12px 14px;
+    padding: 10px 12px;
   }
 
   .messages {
@@ -1013,6 +1087,15 @@ input[type="range"] {
 
   .composer {
     padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .app-shell:not(.is-sidebar-open) .messages,
+  .app-shell:not(.is-sidebar-open) .composer {
+    width: 100%;
+  }
+
+  .app-shell:not(.is-sidebar-open) .chat-header {
+    padding-inline: 12px;
   }
 
   .composer-main {
@@ -1038,10 +1121,6 @@ input[type="range"] {
 }
 
 @media (max-width: 560px) {
-  .sidebar {
-    max-height: 42dvh;
-  }
-
   .sidebar-actions {
     grid-template-columns: 1fr;
   }

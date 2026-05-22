@@ -47,7 +47,7 @@
 
     <!-- ── Main app ── -->
     <main class="app-shell" id="appShell" hidden>
-      <aside class="sidebar">
+      <aside class="sidebar" id="sidebar">
         <div class="sidebar-top">
           <div>
             <p class="eyebrow">NVIDIA NIM</p>
@@ -116,9 +116,13 @@
           </div>
         </div>
       </aside>
+      <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
       <section class="chat-pane" aria-label="Chat">
         <header class="chat-header">
+          <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          </button>
           <div class="chat-title-wrap">
             <p class="eyebrow" id="activeModelLabel">Model</p>
             <h2 id="chatTitle" title="双击修改标题">New chat</h2>
