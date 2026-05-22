@@ -507,8 +507,17 @@ function addMessage(message) {
 
   const body = node.querySelector(".message-body");
   if (message.role === "assistant") {
-    body.innerHTML = renderMarkdown(message.content || "", message.sources || []);
-    renderSources(body, message.sources || []);
+    if (!message.content) {
+      // 显示 thinking 动画，等待首个 token
+      body.innerHTML = `
+        <div class="thinking-indicator">
+          <div class="thinking-dots"><span></span><span></span><span></span></div>
+          <span class="thinking-label">Thinking…</span>
+        </div>`;
+    } else {
+      body.innerHTML = renderMarkdown(message.content, message.sources || []);
+      renderSources(body, message.sources || []);
+    }
   } else {
     const text = document.createElement("div");
     text.className = "message-text";
@@ -555,7 +564,11 @@ function renderConversationList() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "conversation-item";
-    button.textContent = conversation.title || "New chat";
+    // 用 span 包裹标题文字，使 text-overflow ellipsis 生效
+    const titleSpan = document.createElement("span");
+    titleSpan.className = "conversation-title-text";
+    titleSpan.textContent = conversation.title || "New chat";
+    button.appendChild(titleSpan);
     button.addEventListener("click", () => {
       state.activeId = conversation.id;
       editingState = null;
@@ -731,6 +744,9 @@ function updateAssistantMessage(conversationId, assistant) {
   const meta = document.querySelector(`[data-message-id="${assistant.id}"] .message-meta`);
   if (!body || !meta) return;
   meta.firstElementChild.textContent = modelName(assistant.model);
+  // 移除 thinking 动画（如果还在）
+  const thinking = body.querySelector(".thinking-indicator");
+  if (thinking) thinking.remove();
   body.innerHTML = renderMarkdown(assistant.content, assistant.sources);
   renderSources(body, assistant.sources);
   scrollMessagesToEnd();
@@ -1090,8 +1106,10 @@ exportButton.addEventListener("click", () => {
 });
 
 // 双击标题可编辑
+let isEditingTitle = false;
+
 chatTitle.addEventListener("dblclick", () => {
-  const conversation = getActiveConversation();
+  isEditingTitle = true;
   chatTitle.contentEditable = "true";
   chatTitle.focus();
   // 选中全部文字
@@ -1108,7 +1126,8 @@ chatTitle.addEventListener("keydown", (event) => {
     chatTitle.blur();
   }
   if (event.key === "Escape") {
-    // 恢复原标题
+    // 恢复原标题，不保存
+    isEditingTitle = false;
     const conversation = getActiveConversation();
     chatTitle.textContent = conversation.title || "New chat";
     chatTitle.contentEditable = "false";
@@ -1116,16 +1135,19 @@ chatTitle.addEventListener("keydown", (event) => {
 });
 
 chatTitle.addEventListener("blur", () => {
-  if (chatTitle.contentEditable !== "true") return;
+  if (!isEditingTitle) return;
+  isEditingTitle = false;
   chatTitle.contentEditable = "false";
   const newTitle = chatTitle.textContent.trim();
   const conversation = getActiveConversation();
-  if (newTitle) {
+  if (newTitle && newTitle !== (conversation.title || "New chat")) {
+    // 仅当标题实际改变时才保存并标记为已生成
     conversation.title = newTitle;
     conversation.titleGenerated = true;
     saveState();
     renderConversationList();
   } else {
+    // 未改变时还原显示，不影响 titleGenerated
     chatTitle.textContent = conversation.title || "New chat";
   }
 });
