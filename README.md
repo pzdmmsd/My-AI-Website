@@ -1,8 +1,8 @@
 # NVIDIA NIM Chat Site
 
-一个部署到 Cloudflare Pages 的 NVIDIA NIM 聊天网页。前端只访问同源 `/api/chat`，NVIDIA API key 保存在 Cloudflare Secret 中。
+一个部署到 Cloudflare Pages 的 NVIDIA NIM 聊天站点。前端只访问同源 `/api/*`，NVIDIA API key、管理员账号和用户数据都保存在 Cloudflare 的服务端配置或 KV 中。
 
-## 本地运行 
+## 本地运行
 
 1. 安装依赖：
 
@@ -16,30 +16,43 @@
    cp .dev.vars.example .dev.vars
    ```
 
-   然后把 `.dev.vars` 里的 `NVIDIA_API_KEY` 改成你的真实密钥。
+3. 修改 `.dev.vars`：
 
-3. 启动：
+   ```env
+   NVIDIA_API_KEY=your_nvidia_nim_api_key
+   ADMIN_USERNAME=admin
+   ADMIN_PASSWORD=change_this_password
+   ```
+
+4. 启动：
 
    ```bash
    npm run dev
    ```
 
-## Cloudflare 部署
+## Cloudflare Pages 部署
 
-1. 登录 Cloudflare：
+项目继续使用 Cloudflare Pages + Pages Functions，不需要迁移到 Workers。
 
-   ```bash
-   npx wrangler login
-   ```
-
-2. 设置 Secret：
+1. 设置 Secrets：
 
    ```bash
    npx wrangler pages secret put NVIDIA_API_KEY
-   npx wrangler pages secret put APP_PASSWORD
+   npx wrangler pages secret put ADMIN_USERNAME
+   npx wrangler pages secret put ADMIN_PASSWORD
    ```
 
-   `APP_PASSWORD` 可不设置；不设置时站点公开可访问。
+2. 确认 KV 绑定：
+
+   `wrangler.toml` 已配置：
+
+   ```toml
+   [[kv_namespaces]]
+   binding = "CHAT_KV"
+   id = "ca5f55ca7b5a4211a3a6e03513555e5c"
+   ```
+
+   Cloudflare Pages 项目后台也需要有同名绑定 `CHAT_KV`，指向这个 KV namespace。
 
 3. 部署：
 
@@ -47,45 +60,39 @@
    npm run deploy
    ```
 
+## 账号模式
+
+- 站点不开放自助注册。
+- 管理员使用 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 登录。
+- 普通用户只能由管理员在 `/admin.html` 后台创建。
+- 删除普通用户后，该用户旧 session 会失效。
+- 管理员修改普通用户密码后，该用户旧 session 会失效。
+- 修改 `ADMIN_PASSWORD` 后，旧管理员 session 会失效，需要重新登录。
+
 ## 配置
 
 - `NVIDIA_API_KEY`: 必填，NVIDIA NIM API key。
-- `NVIDIA_BASE_URL`: 默认 `https://integrate.api.nvidia.com/v1`。
-- `NVIDIA_MODEL`: 默认 `google/gemma-4-31b-it`。
-- `APP_PASSWORD`: 可选，给网站加一个简单访问密码。
-- `SEARCH_PROVIDER`: 可选，`tavily` 或 `brave`，默认优先使用 Tavily。
-- `TAVILY_API_KEY`: 可选，开启联网模式时用于 Tavily Search API。
-- `BRAVE_SEARCH_API_KEY`: 可选，开启联网模式时用于 Brave Search API。
-- `SEARCH_MAX_RESULTS`: 可选，联网模式每次搜索使用的结果数，默认 `5`。
+- `NVIDIA_BASE_URL`: 可选，默认 `https://integrate.api.nvidia.com/v1`。
+- `NVIDIA_MODEL`: 可选，默认 `google/gemma-4-31b-it`。
+- `ADMIN_USERNAME`: 必填，后台管理员用户名。
+- `ADMIN_PASSWORD`: 必填，后台管理员密码。
+- `SEARCH_PROVIDER`: 可选，`tavily` 或 `brave`。
+- `TAVILY_API_KEY`: 可选，联网搜索使用 Tavily。
+- `BRAVE_SEARCH_API_KEY`: 可选，联网搜索使用 Brave Search。
+- `SEARCH_MAX_RESULTS`: 可选，联网搜索结果数，默认 `5`。
 
 ## 功能
 
-- 从 NVIDIA `GET /v1/models` 动态读取当前 API key 可见模型，并显示为下拉列表。
-- 下拉列表会用极短的 `/v1/chat/completions` 请求验证模型，只有真实可用于聊天的模型才会展示。
-- 模型验证结果缓存在 Cloudflare Cache 中；网页读取 `/api/models` 会立即返回缓存，缓存过旧时后端会用 `waitUntil` 在后台刷新。可访问 `/api/models?refresh=1` 强制同步刷新。
-- 支持 ChatGPT 风格的多对话列表。
-- 支持 System / Dark / Light 三种主题模式。
-- 按 Enter 发送，Shift+Enter 换行。
-- 支持分批上传文本类文件，单个文件超过 180 KB 会被拒绝；聊天界面只显示文件卡片，发送给模型时才附加文件内容。
-- AI 回复标题显示实际返回的模型名称。
-- AI 回复会按 Markdown 渲染。
-- Markdown 代码块会显示语言标签，并提供轻量关键字高亮。
-- 页面固定为应用高度，长对话只在消息区滚动。
-- 联网模式会先搜索网页，再把来源片段注入模型上下文；AI 回复下方会显示来源链接。需要配置 `TAVILY_API_KEY` 或 `BRAVE_SEARCH_API_KEY`。
-- 多个对话可以同时生成；右上角 Stop 只停止当前打开的对话。
-- Web 模式按对话单独保存，不同对话可以独立开关。
-- 对话列表支持悬停删除；已发送的用户消息支持编辑，并会从编辑位置截断后续内容重新生成。
-- 对话标题会在首轮问答完成后由模型根据首个问题和回答自动生成。
+- 多用户登录。
+- 只允许后台创建普通用户。
+- 管理员后台支持创建用户、删除用户、修改密码。
+- 聊天接口和模型列表接口都要求有效 session。
+- 支持多会话聊天、模型选择、Markdown 渲染、文件文本附加、联网搜索、主题切换、导出聊天记录。
 
-如果希望完全按固定时间刷新模型可用性，可以用 Cloudflare Workers Cron Trigger 定时请求线上 `/api/models?refresh=1`。当前 Pages Function 已经支持该刷新入口。
-
-如果 NVIDIA 返回 `Function ... Not found for account ...`，通常是当前 API key 对请求的模型没有权限。把 `.dev.vars` 或 Cloudflare Secret/变量里的 `NVIDIA_MODEL` 改成该 key 可访问的模型，然后重启本地服务或重新部署。
-
-NVIDIA NIM LLM 提供 OpenAI-compatible `/v1/chat/completions` 和 `GET /v1/models` 接口。Cloudflare Pages Function 在服务端转发请求，避免密钥泄露到浏览器；前端模型下拉列表会优先读取当前 API key 可见的模型。
-
-参考：
+## 参考
 
 - [NVIDIA NIM for LLMs API Reference](https://docs.nvidia.com/nim/large-language-models/latest/reference/api-reference.html)
 - [Cloudflare Pages Functions](https://developers.cloudflare.com/pages/functions/)
+- [Cloudflare Pages Functions Bindings](https://developers.cloudflare.com/pages/functions/bindings/)
 - [Tavily Search API](https://docs.tavily.com/api-reference/endpoint/search)
 - [Brave Search API](https://brave.com/search/api/)

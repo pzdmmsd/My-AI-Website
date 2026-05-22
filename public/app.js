@@ -4,7 +4,6 @@ const form = document.querySelector("#chatForm");
 const promptInput = document.querySelector("#promptInput");
 const modelSelect = document.querySelector("#modelSelect");
 const systemInput = document.querySelector("#systemInput");
-const passwordInput = document.querySelector("#passwordInput");
 const temperatureInput = document.querySelector("#temperatureInput");
 const temperatureValue = document.querySelector("#temperatureValue");
 const maxTokensInput = document.querySelector("#maxTokensInput");
@@ -22,9 +21,15 @@ const fileInput = document.querySelector("#fileInput");
 const attachmentRow = document.querySelector("#attachmentRow");
 
 const storageKey = "nim-chat-state-v3";
+const TOKEN_KEY = "nim-session-token";
 const maxFileBytes = 180 * 1024;
 const defaultSystemPrompt = "You are a precise, direct, helpful AI assistant.";
 const fallbackModels = ["google/gemma-4-31b-it"];
+
+function getSessionToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
+function authHeaders() {
+  return { "Content-Type": "application/json", "X-Session-Token": getSessionToken() };
+}
 
 let state = createInitialState();
 const controllers = new Map();
@@ -39,7 +44,6 @@ function createInitialState() {
     settings: {
       model: "",
       system: defaultSystemPrompt,
-      password: "",
       temperature: "0.3",
       maxTokens: ""
     },
@@ -118,7 +122,6 @@ function loadState() {
   }
 
   systemInput.value = state.settings.system || defaultSystemPrompt;
-  passwordInput.value = state.settings.password;
   temperatureInput.value = state.settings.temperature;
   maxTokensInput.value = state.settings.maxTokens;
   temperatureValue.textContent = state.settings.temperature;
@@ -129,7 +132,6 @@ function saveState() {
   state.settings = {
     model: modelSelect.value,
     system: systemInput.value,
-    password: passwordInput.value,
     temperature: temperatureInput.value,
     maxTokens: maxTokensInput.value.trim()
   };
@@ -367,7 +369,7 @@ function renderMarkdown(markdown, sources = []) {
     }
 
     const unordered = trimmed.match(/^[-*]\s+(.+)$/);
-    if (unordered) {
+    if (unordered && !trimmed.match(/^[-*]{3,}\s*$/)) {
       flushParagraph();
       if (listType && listType !== "ul") flushList();
       listType = "ul";
@@ -382,6 +384,15 @@ function renderMarkdown(markdown, sources = []) {
       if (listType && listType !== "ol") flushList();
       listType = "ol";
       listItems.push(ordered[1]);
+      lineIndex += 1;
+      continue;
+    }
+
+    // Horizontal rule (---, ***, ___)
+    if (/^[-*_]{3,}\s*$/.test(trimmed)) {
+      flushParagraph();
+      flushList();
+      blocks.push("<hr>");
       lineIndex += 1;
       continue;
     }
@@ -413,9 +424,7 @@ async function loadModels() {
 
   try {
     const response = await fetch("/api/models", {
-      headers: {
-        "X-App-Password": passwordInput.value
-      }
+      headers: { "X-Session-Token": getSessionToken() }
     });
     if (!response.ok) return;
 
@@ -846,7 +855,7 @@ async function sendMessage() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-App-Password": passwordInput.value
+        "X-Session-Token": getSessionToken()
       },
       body: JSON.stringify(body),
       signal: controller.signal
@@ -940,7 +949,7 @@ async function maybeGenerateTitle(conversation) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-App-Password": passwordInput.value
+        "X-Session-Token": getSessionToken()
       },
       body: JSON.stringify({
         model: conversation.model || modelSelect.value,
@@ -1012,12 +1021,9 @@ temperatureInput.addEventListener("input", () => {
   saveState();
 });
 
-for (const input of [systemInput, passwordInput, maxTokensInput]) {
+for (const input of [systemInput, maxTokensInput]) {
   input.addEventListener("change", () => {
     saveState();
-    if (input === passwordInput) {
-      loadModels();
-    }
   });
 }
 
@@ -1172,8 +1178,92 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
   if (state.theme === "system") applyTheme("system");
 });
 
-loadState();
-renderAll();
-syncRunState();
-autoResizePrompt();
-await loadModels();
+// ── Auth & boot ──────────────────────────────────────────────
+const loginOverlay = document.getElementById("loginOverlay");
+const appShell    = document.getElementById("appShell");
+const loginForm   = document.getElementById("loginForm");
+const loginError  = document.getElementById("loginError");
+const loginBtn    = document.getElementById("loginBtn");
+const userAvatar  = document.getElementById("userAvatar");
+const userName    = document.getElementById("userName");
+const userRole    = document.getElementById("userRole");
+const logoutButton    = document.getElementById("logoutButton");
+const adminPanelBtn   = document.getElementById("adminPanelBtn");
+
+function showApp(session) {
+  loginOverlay.hidden = true;
+  appShell.hidden = false;
+  userAvatar.textContent = session.username[0].toUpperCase();
+  userName.textContent = session.username;
+  userRole.textContent = session.isAdmin ? "admin" : "user";
+  adminPanelBtn.hidden = !session.isAdmin;
+}
+
+function showLogin() {
+  appShell.hidden = true;
+  loginOverlay.hidden = false;
+}
+
+async function boot() {
+  const token = getSessionToken();
+  if (token) {
+    const res = await fetch("/api/auth/me", { headers: { "X-Session-Token": token } });
+    if (res.ok) {
+      const session = await res.json();
+      loadState();
+      showApp(session);
+      renderAll();
+      syncRunState();
+      autoResizePrompt();
+      await loadModels();
+      return;
+    }
+    localStorage.removeItem(TOKEN_KEY);
+  }
+  showLogin();
+}
+
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const username = document.getElementById("loginUsername").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  if (!username || !password) return;
+
+  loginBtn.disabled = true;
+  loginBtn.textContent = "Signing in…";
+  loginError.hidden = true;
+
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      loginError.textContent = data.error || "Invalid credentials.";
+      loginError.hidden = false;
+      return;
+    }
+    localStorage.setItem(TOKEN_KEY, data.token);
+    loadState();
+    showApp(data);
+    renderAll();
+    syncRunState();
+    autoResizePrompt();
+    await loadModels();
+  } finally {
+    loginBtn.disabled = false;
+    loginBtn.textContent = "Sign in";
+  }
+});
+
+logoutButton.addEventListener("click", async () => {
+  await fetch("/api/auth/logout", { method: "POST", headers: { "X-Session-Token": getSessionToken() } });
+  localStorage.removeItem(TOKEN_KEY);
+  showLogin();
+});
+
+adminPanelBtn.addEventListener("click", () => { location.href = "/admin.html"; });
+
+boot();

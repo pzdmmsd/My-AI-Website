@@ -1,7 +1,8 @@
 NVIDIA_API_KEY=your_nvidia_nim_api_key
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
 NVIDIA_MODEL=google/gemma-4-31b-it
-APP_PASSWORD=
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=change_this_password
 SEARCH_PROVIDER=tavily
 TAVILY_API_KEY=
 BRAVE_SEARCH_API_KEY=

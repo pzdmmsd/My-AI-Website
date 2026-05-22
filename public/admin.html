@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin - NVIDIA NIM Chat</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="admin-page">
+    <div class="admin-topbar">
+      <div>
+        <div class="admin-topbar-title">Admin Dashboard</div>
+        <div class="admin-topbar-sub" id="adminLabel">Loading...</div>
+      </div>
+      <div class="admin-topbar-actions">
+        <button class="admin-btn admin-btn-ghost admin-btn-sm" id="backBtn" type="button">Back to Chat</button>
+        <button class="admin-btn admin-btn-ghost admin-btn-sm" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+
+    <main class="admin-container">
+      <section class="admin-card">
+        <div class="admin-card-header">
+          <h2>Add New User</h2>
+        </div>
+        <div class="admin-add-form">
+          <div class="admin-form-row">
+            <label class="admin-label">
+              Username
+              <input id="newUsername" type="text" placeholder="e.g. alice" autocomplete="off" />
+            </label>
+            <label class="admin-label">
+              Password
+              <input id="newPassword" type="password" placeholder="Min 6 characters" />
+            </label>
+            <button class="admin-btn admin-btn-primary admin-add-btn" id="addBtn" type="button">Add User</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="admin-card">
+        <div class="admin-card-header">
+          <h2>Users</h2>
+          <span class="admin-count" id="userCount"></span>
+        </div>
+        <table class="admin-user-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Created</th>
+              <th>Role</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="userTableBody">
+            <tr>
+              <td colspan="4" class="admin-empty">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <div class="admin-modal-overlay" id="pwModal">
+      <div class="admin-modal">
+        <h3>Change Password</h3>
+        <p class="admin-muted" id="pwModalUser"></p>
+        <label class="admin-label">
+          New Password
+          <input id="pwInput" type="password" placeholder="Min 6 characters" />
+        </label>
+        <div class="admin-modal-actions">
+          <button class="admin-btn admin-btn-ghost admin-btn-sm" id="pwCancelBtn" type="button">Cancel</button>
+          <button class="admin-btn admin-btn-primary admin-btn-sm" id="pwSaveBtn" type="button">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-toast" id="toast"></div>
+
+    <script src="/admin.js" type="module"></script>
+  </body>
+</html>

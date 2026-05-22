@@ -1,4 +1,5 @@
 import { hasSearchConfig, sourcesToPrompt, webSearch } from "../_search.js";
+import { requireAuth } from "../_auth.js";
 
 const DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1";
 const DEFAULT_MODEL = "google/gemma-4-31b-it";
@@ -33,15 +34,11 @@ function normalizeMessages(messages) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
+  const session = await requireAuth(context);
+  if (session instanceof Response) return session;
+
   if (!env.NVIDIA_API_KEY) {
     return fail("NVIDIA_API_KEY is not configured.", 500);
-  }
-
-  if (env.APP_PASSWORD) {
-    const providedPassword = request.headers.get("X-App-Password") || "";
-    if (providedPassword !== env.APP_PASSWORD) {
-      return fail("Invalid app password.", 401);
-    }
   }
 
   let body;
