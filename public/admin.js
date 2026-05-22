@@ -1,5 +1,7 @@
 const TOKEN_KEY = "nim-session-token";
+const storageKey = "nim-chat-state-v3";
 let editingUsername = null;
+let currentAdminUsername = "";
 
 function getToken() {
   return localStorage.getItem(TOKEN_KEY) || "";
@@ -23,6 +25,28 @@ function redirectToChat() {
   location.href = "/";
 }
 
+function readStoredState(username) {
+  const keys = username ? [`${storageKey}:${username.toLowerCase()}`, storageKey] : [storageKey];
+  for (const key of keys) {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || "null");
+      if (parsed) return parsed;
+    } catch {
+      // Ignore malformed local state and fall back to defaults.
+    }
+  }
+  return {};
+}
+
+function applyStoredTheme(username) {
+  const stored = readStoredState(username);
+  const theme = stored.theme || "system";
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const resolved = theme === "system" ? (prefersDark ? "dark" : "light") : theme;
+  document.documentElement.dataset.theme = resolved;
+  document.documentElement.dataset.color = stored.settings?.color || "blue";
+}
+
 async function jsonFrom(response) {
   try {
     return await response.json();
@@ -39,6 +63,8 @@ async function boot() {
   }
 
   const { username, isAdmin } = await res.json();
+  currentAdminUsername = username;
+  applyStoredTheme(username);
   if (!isAdmin) {
     redirectToChat();
     return;
@@ -211,4 +237,9 @@ document.getElementById("pwModal").addEventListener("click", (event) => {
   if (event.target === event.currentTarget) closePwModal();
 });
 
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  applyStoredTheme(currentAdminUsername);
+});
+
+applyStoredTheme();
 boot();

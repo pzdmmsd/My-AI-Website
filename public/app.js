@@ -5,6 +5,7 @@ const promptInput = document.querySelector("#promptInput");
 const modelSelect = document.querySelector("#modelSelect");
 const systemInput = document.querySelector("#systemInput");
 const colorSelect = document.querySelector("#colorSelect");
+const colorOptionButtons = document.querySelectorAll("[data-color-option]");
 const temperatureInput = document.querySelector("#temperatureInput");
 const temperatureValue = document.querySelector("#temperatureValue");
 const maxTokensInput = document.querySelector("#maxTokensInput");
@@ -162,6 +163,7 @@ function loadState(username = currentSession?.username) {
 function applyStateToControls() {
   systemInput.value = state.settings.system || defaultSystemPrompt;
   colorSelect.value = state.settings.color || "blue";
+  syncColorOptions();
   temperatureInput.value = state.settings.temperature;
   maxTokensInput.value = state.settings.maxTokens;
   temperatureValue.textContent = state.settings.temperature;
@@ -242,6 +244,24 @@ function applyTheme(theme) {
       : theme === "light"
         ? '<path d="M12 4v2m0 12v2M4 12H2m20 0h-2M5.6 5.6 4.2 4.2m15.6 15.6-1.4-1.4m0-12.8 1.4-1.4M4.2 19.8l1.4-1.4M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />'
         : '<path d="M4 5h16v11H4zM8 20h8M10 16v4m4-4v4" />';
+}
+
+function syncColorOptions() {
+  const selected = state.settings.color || colorSelect.value || "blue";
+  colorSelect.value = selected;
+  for (const button of colorOptionButtons) {
+    const active = button.dataset.colorOption === selected;
+    button.classList.toggle("is-selected", active);
+    button.setAttribute("aria-checked", active ? "true" : "false");
+  }
+}
+
+function selectThemeColor(color) {
+  state.settings.color = color;
+  colorSelect.value = color;
+  syncColorOptions();
+  applyTheme(state.theme);
+  saveState();
 }
 
 function cycleTheme() {
@@ -1177,10 +1197,14 @@ for (const input of [systemInput, maxTokensInput]) {
 }
 
 colorSelect.addEventListener("change", () => {
-  state.settings.color = colorSelect.value;
-  applyTheme(state.theme);
-  saveState();
+  selectThemeColor(colorSelect.value);
 });
+
+for (const button of colorOptionButtons) {
+  button.addEventListener("click", () => {
+    selectThemeColor(button.dataset.colorOption);
+  });
+}
 
 modelSelect.addEventListener("change", () => {
   const conversation = getActiveConversation();
@@ -1254,7 +1278,6 @@ newChatButton.addEventListener("click", () => {
   pendingFiles = [];
   saveState();
   renderAll();
-  closeSidebarDrawer();
 });
 
 exportButton.addEventListener("click", () => {
