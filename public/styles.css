@@ -135,23 +135,20 @@ button svg {
 }
 
 .app-shell {
+  --sidebar-width: 320px;
   display: grid;
-  grid-template-columns: 0 minmax(0, 1fr);
+  grid-template-columns: 0 100%;
   height: 100dvh;
   max-height: 100dvh;
   min-height: 0;
   overflow: hidden;
-  transition: grid-template-columns 280ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-.app-shell.is-sidebar-open {
-  grid-template-columns: 320px minmax(0, 1fr);
 }
 
 .sidebar {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
   gap: 14px;
+  width: var(--sidebar-width);
   min-height: 0;
   padding: 18px 14px 12px;
   background:
@@ -572,6 +569,12 @@ input[type="range"] {
   overflow: hidden;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--surface) 72%, var(--bg)) 0%, var(--bg) 180px);
+  transform: translateX(0);
+  transition: transform 280ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.app-shell.is-sidebar-open .chat-pane {
+  transform: translateX(var(--sidebar-width));
 }
 
 .chat-header {
@@ -629,13 +632,13 @@ input[type="range"] {
   scroll-behavior: smooth;
 }
 
-.app-shell:not(.is-sidebar-open) .messages,
-.app-shell:not(.is-sidebar-open) .composer {
+.messages,
+.composer {
   width: min(100%, 980px);
   margin-inline: auto;
 }
 
-.app-shell:not(.is-sidebar-open) .chat-header {
+.chat-header {
   padding-inline: max(22px, calc((100vw - 980px) / 2 + 22px));
 }
 
@@ -1129,6 +1132,7 @@ input[type="range"] {
   }
 
   .app-shell {
+    --sidebar-width: min(330px, 86vw);
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr);
     height: 100dvh;
@@ -1139,7 +1143,7 @@ input[type="range"] {
     position: fixed;
     inset: 0 auto 0 0;
     z-index: 120;
-    width: min(330px, 86vw);
+    width: var(--sidebar-width);
     grid-template-rows: auto auto minmax(0, 1fr) auto auto;
     gap: 12px;
     height: 100dvh;
@@ -1278,12 +1282,12 @@ input[type="range"] {
     padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
   }
 
-  .app-shell:not(.is-sidebar-open) .messages,
-  .app-shell:not(.is-sidebar-open) .composer {
+  .messages,
+  .composer {
     width: 100%;
   }
 
-  .app-shell:not(.is-sidebar-open) .chat-header {
+  .chat-header {
     padding-inline: 12px;
   }
 
@@ -1657,6 +1661,11 @@ input[type="range"] {
   gap: 10px;
 }
 
+.admin-topbar-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .admin-container {
   width: min(860px, calc(100% - 40px));
   margin: 0 auto;
@@ -1778,8 +1787,16 @@ input[type="range"] {
   margin-bottom: 1px;
 }
 
+.admin-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 .admin-user-table {
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
 }
 
@@ -1788,6 +1805,7 @@ input[type="range"] {
   padding: 13px 22px;
   text-align: left;
   font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 .admin-user-table th {
@@ -1922,6 +1940,10 @@ input[type="range"] {
   }
 
   .admin-actions-cell {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+  }
+
+  .admin-table-scroll {
+    margin-inline: -1px;
   }
 }

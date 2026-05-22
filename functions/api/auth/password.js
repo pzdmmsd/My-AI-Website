@@ -5,13 +5,14 @@ import {
   jsonFail,
   jsonOk,
   requireAuth,
+  setAdminPassword,
+  verifyAdminPassword,
   verifyPassword
 } from "../../_auth.js";
 
 export async function onRequestPost(context) {
   const session = await requireAuth(context);
   if (session instanceof Response) return session;
-  if (session.isAdmin) return jsonFail("Admin password is managed in Cloudflare Pages secrets.", 403);
 
   let body;
   try {
@@ -24,6 +25,14 @@ export async function onRequestPost(context) {
   const newPassword = body.newPassword || "";
   if (!currentPassword || !newPassword) return jsonFail("Current and new password required.");
   if (newPassword.length < 6) return jsonFail("Password must be at least 6 characters.");
+
+  if (session.isAdmin) {
+    if (!await verifyAdminPassword(context.env.CHAT_KV, context.env, session.username, currentPassword)) {
+      return jsonFail("Invalid current password.", 401);
+    }
+    await setAdminPassword(context.env.CHAT_KV, context.env, newPassword);
+    return jsonOk({ ok: true });
+  }
 
   const user = await getUser(context.env.CHAT_KV, session.username);
   if (!user) return jsonFail("User not found.", 404);

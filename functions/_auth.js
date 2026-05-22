@@ -3,6 +3,7 @@
 // ──────────────────────────────────────────────
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const ADMIN_CREDENTIAL_KEY = "admin:credentials";
 
 /** Generate a cryptographically random hex string */
 export function generateToken(byteLength = 32) {
@@ -47,9 +48,58 @@ export function userSessionVersion(user) {
   return user.sessionVersion || user.passwordChangedAt || user.createdAt || "";
 }
 
-async function adminSessionVersion(env) {
+export function adminUsername(env) {
+  return (env.ADMIN_USERNAME || "").trim().toLowerCase();
+}
+
+export async function getAdminCredential(kv, env) {
+  const username = adminUsername(env);
+  if (!username) return null;
+  const raw = await kv.get(ADMIN_CREDENTIAL_KEY);
+  if (!raw) return null;
+  try {
+    const credential = JSON.parse(raw);
+    return credential?.username === username && credential.passwordHash && credential.salt
+      ? credential
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function adminSessionVersion(kv, env) {
+  const credential = await getAdminCredential(kv, env);
+  if (credential) return userSessionVersion(credential);
   if (!env.ADMIN_PASSWORD) return "";
   return sha256Hex(env.ADMIN_PASSWORD);
+}
+
+export async function verifyAdminPassword(kv, env, username, password) {
+  const configuredUsername = adminUsername(env);
+  if (!configuredUsername || username !== configuredUsername || !password) return false;
+
+  const credential = await getAdminCredential(kv, env);
+  if (credential) return verifyPassword(credential, password);
+  return Boolean(env.ADMIN_PASSWORD) && password === env.ADMIN_PASSWORD;
+}
+
+export async function setAdminPassword(kv, env, password) {
+  const username = adminUsername(env);
+  if (!username) throw new Error("Admin username is not configured.");
+  const existing = await getAdminCredential(kv, env);
+  const now = new Date().toISOString();
+  const salt = generateToken(16);
+  const passwordHash = await hashPassword(password, salt);
+  const credential = {
+    username,
+    passwordHash,
+    salt,
+    createdAt: existing?.createdAt || now,
+    passwordChangedAt: now,
+    sessionVersion: generateToken(16)
+  };
+  await kv.put(ADMIN_CREDENTIAL_KEY, JSON.stringify(credential));
+  return credential;
 }
 
 /** Validate session token from KV; returns { username, isAdmin } or null */
@@ -78,11 +128,11 @@ export async function requireAuth(context) {
   if (!session) return jsonFail("Not authenticated.", 401);
 
   if (session.isAdmin) {
-    const adminUser = (env.ADMIN_USERNAME || "").trim().toLowerCase();
-    if (!adminUser || !env.ADMIN_PASSWORD || session.username !== adminUser) {
+    const adminUser = adminUsername(env);
+    if (!adminUser || session.username !== adminUser) {
       return jsonFail("Not authenticated.", 401);
     }
-    if (session.sessionVersion !== await adminSessionVersion(env)) {
+    if (session.sessionVersion !== await adminSessionVersion(env.CHAT_KV, env)) {
       return jsonFail("Not authenticated.", 401);
     }
     return session;
@@ -123,7 +173,7 @@ export async function verifyPassword(user, password) {
 }
 
 export async function createAdminSession(kv, username, env) {
-  return createSession(kv, username, true, await adminSessionVersion(env));
+  return createSession(kv, username, true, await adminSessionVersion(kv, env));
 }
 
 /** Create a new session in KV; returns the token */

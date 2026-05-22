@@ -1387,7 +1387,7 @@ function showApp(session) {
   userName.textContent = session.username;
   userRole.textContent = session.isAdmin ? "admin" : "user";
   adminPanelBtn.hidden = !session.isAdmin;
-  changePasswordBtn.hidden = Boolean(session.isAdmin);
+  changePasswordBtn.hidden = false;
 }
 
 function showLogin() {

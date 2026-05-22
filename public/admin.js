@@ -1,6 +1,7 @@
 const TOKEN_KEY = "nim-session-token";
 const storageKey = "nim-chat-state-v3";
 let editingUsername = null;
+let editingAdminPassword = false;
 let currentAdminUsername = "";
 
 function getToken() {
@@ -38,6 +39,11 @@ function readStoredState(username) {
   return {};
 }
 
+function writeStoredState(username, state) {
+  if (!username || !state) return;
+  localStorage.setItem(`${storageKey}:${username.toLowerCase()}`, JSON.stringify(state));
+}
+
 function applyStoredTheme(username) {
   const stored = readStoredState(username);
   const theme = stored.theme || "system";
@@ -45,6 +51,21 @@ function applyStoredTheme(username) {
   const resolved = theme === "system" ? (prefersDark ? "dark" : "light") : theme;
   document.documentElement.dataset.theme = resolved;
   document.documentElement.dataset.color = stored.settings?.color || "blue";
+}
+
+async function applySyncedTheme(username) {
+  try {
+    const response = await fetch("/api/state", { headers: { "X-Session-Token": getToken() } });
+    if (response.ok) {
+      const payload = await response.json();
+      if (payload.state && typeof payload.state === "object") {
+        writeStoredState(username, payload.state);
+      }
+    }
+  } catch {
+    // Local theme state is still available when sync cannot be reached.
+  }
+  applyStoredTheme(username);
 }
 
 async function jsonFrom(response) {
@@ -64,7 +85,7 @@ async function boot() {
 
   const { username, isAdmin } = await res.json();
   currentAdminUsername = username;
-  applyStoredTheme(username);
+  await applySyncedTheme(username);
   if (!isAdmin) {
     redirectToChat();
     return;
@@ -188,22 +209,50 @@ async function deleteUser(username) {
   await loadUsers();
 }
 
-function openPwModal(username) {
+function openPwModal(username, adminPassword = false) {
   editingUsername = username;
-  document.getElementById("pwModalUser").textContent = `User: ${username}`;
+  editingAdminPassword = adminPassword;
+  document.getElementById("pwModalUser").textContent = adminPassword ? `Admin: ${username}` : `User: ${username}`;
+  document.getElementById("pwCurrentLabel").hidden = !adminPassword;
+  document.getElementById("pwCurrentInput").value = "";
   document.getElementById("pwInput").value = "";
   document.getElementById("pwModal").classList.add("open");
-  document.getElementById("pwInput").focus();
+  document.getElementById(adminPassword ? "pwCurrentInput" : "pwInput").focus();
 }
 
 function closePwModal() {
   document.getElementById("pwModal").classList.remove("open");
+  editingAdminPassword = false;
 }
 
 async function savePassword() {
   const newPassword = document.getElementById("pwInput").value;
   if (!editingUsername || !newPassword) {
     showToast("Enter a new password", "error");
+    return;
+  }
+
+  if (editingAdminPassword) {
+    const currentPassword = document.getElementById("pwCurrentInput").value;
+    if (!currentPassword) {
+      showToast("Enter the current password", "error");
+      return;
+    }
+
+    const res = await fetch("/api/auth/password", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    const data = await jsonFrom(res);
+    if (!res.ok) {
+      showToast(data.error || "Error", "error");
+      return;
+    }
+
+    showToast("Password changed. Sign in again.", "success");
+    closePwModal();
+    await logout();
     return;
   }
 
@@ -229,6 +278,7 @@ async function logout() {
 }
 
 document.getElementById("backBtn").addEventListener("click", redirectToChat);
+document.getElementById("adminPasswordBtn").addEventListener("click", () => openPwModal(currentAdminUsername, true));
 document.getElementById("addBtn").addEventListener("click", addUser);
 document.getElementById("logoutBtn").addEventListener("click", logout);
 document.getElementById("pwCancelBtn").addEventListener("click", closePwModal);
@@ -239,6 +289,12 @@ document.getElementById("pwModal").addEventListener("click", (event) => {
 
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
   applyStoredTheme(currentAdminUsername);
+});
+
+window.addEventListener("storage", (event) => {
+  if (event.key === storageKey || event.key === `${storageKey}:${currentAdminUsername.toLowerCase()}`) {
+    applyStoredTheme(currentAdminUsername);
+  }
 });
 
 applyStoredTheme();

@@ -1,6 +1,7 @@
 import {
   jsonFail, jsonOk, getUser, verifyPassword,
-  createSession, createAdminSession, userSessionVersion
+  adminUsername, createSession, createAdminSession,
+  userSessionVersion, verifyAdminPassword
 } from "../../_auth.js";
 
 export async function onRequestPost(context) {
@@ -15,9 +16,9 @@ export async function onRequestPost(context) {
   if (!username || !password) return jsonFail("Username and password required.");
 
   // ── Check admin credentials (stored in env secrets) ──────────────
-  const adminUser = (env.ADMIN_USERNAME || "").trim().toLowerCase();
-  if (username === adminUser && env.ADMIN_PASSWORD) {
-    if (password !== env.ADMIN_PASSWORD) {
+  const adminUser = adminUsername(env);
+  if (username === adminUser) {
+    if (!await verifyAdminPassword(env.CHAT_KV, env, username, password)) {
       return jsonFail("Invalid credentials.", 401);
     }
     const token = await createAdminSession(env.CHAT_KV, username, env);
