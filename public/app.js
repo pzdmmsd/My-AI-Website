@@ -19,6 +19,7 @@ const attachButton = document.querySelector("#attachButton");
 const webModeButton = document.querySelector("#webModeButton");
 const fileInput = document.querySelector("#fileInput");
 const attachmentRow = document.querySelector("#attachmentRow");
+const settingsPanel = document.querySelector("#settingsPanel");
 
 const storageKey = "nim-chat-state-v3";
 const TOKEN_KEY = "nim-session-token";
@@ -35,6 +36,9 @@ let state = createInitialState();
 const controllers = new Map();
 let pendingFiles = [];
 let editingState = null;
+let currentSession = null;
+let isHydratingState = false;
+let remoteSaveTimer = null;
 
 function createInitialState() {
   const id = crypto.randomUUID();
@@ -98,7 +102,16 @@ function migrateState(parsed) {
     merged.settings.maxTokens = "";
   }
 
+  merged.conversations = Array.isArray(merged.conversations) && merged.conversations.length
+    ? merged.conversations
+    : fresh.conversations;
+
   for (const conversation of merged.conversations) {
+    conversation.id ||= crypto.randomUUID();
+    conversation.title ||= "New chat";
+    conversation.titleGenerated = Boolean(conversation.titleGenerated);
+    conversation.model ||= "";
+    conversation.updatedAt = Number(conversation.updatedAt) || Date.now();
     conversation.webMode = Boolean(conversation.webMode ?? merged.settings.webMode);
     conversation.messages = (conversation.messages || []).map((message) => ({
       ...message,
@@ -111,21 +124,83 @@ function migrateState(parsed) {
   return merged;
 }
 
-function loadState() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(storageKey) || "null");
-    if (parsed?.conversations?.length) {
-      state = migrateState(parsed);
-    }
-  } catch {
-    state = createInitialState();
-  }
+function scopedStorageKey(username = currentSession?.username) {
+  return username ? `${storageKey}:${username.toLowerCase()}` : storageKey;
+}
 
+function readStoredState(username = currentSession?.username) {
+  try {
+    return JSON.parse(localStorage.getItem(scopedStorageKey(username)) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredState(username = currentSession?.username) {
+  localStorage.setItem(scopedStorageKey(username), JSON.stringify(state));
+}
+
+function loadState(username = currentSession?.username) {
+  const parsed = readStoredState(username) || readStoredState(null);
+  state = parsed?.conversations?.length ? migrateState(parsed) : createInitialState();
+  applyStateToControls();
+}
+
+function applyStateToControls() {
   systemInput.value = state.settings.system || defaultSystemPrompt;
   temperatureInput.value = state.settings.temperature;
   maxTokensInput.value = state.settings.maxTokens;
   temperatureValue.textContent = state.settings.temperature;
   applyTheme(state.theme);
+}
+
+async function loadRemoteState() {
+  const response = await fetch("/api/state", { headers: { "X-Session-Token": getSessionToken() } });
+  if (!response.ok) return null;
+  const payload = await response.json();
+  return payload.state?.conversations?.length ? migrateState(payload.state) : null;
+}
+
+async function saveRemoteStateNow() {
+  if (!currentSession || isHydratingState) return;
+  clearTimeout(remoteSaveTimer);
+  remoteSaveTimer = null;
+
+  try {
+    await fetch("/api/state", {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ state })
+    });
+  } catch {
+    // Local state remains available; the next successful save will resync.
+  }
+}
+
+function queueRemoteSave() {
+  if (!currentSession || isHydratingState) return;
+  clearTimeout(remoteSaveTimer);
+  remoteSaveTimer = setTimeout(saveRemoteStateNow, 700);
+}
+
+async function hydrateSyncedState(session) {
+  currentSession = session;
+  isHydratingState = true;
+  loadState(session.username);
+
+  const localHadState = Boolean(readStoredState(session.username)?.conversations?.length || readStoredState(null)?.conversations?.length);
+  const remoteState = await loadRemoteState();
+  if (remoteState) {
+    state = remoteState;
+    writeStoredState(session.username);
+    applyStateToControls();
+  }
+
+  isHydratingState = false;
+  if (!remoteState && localHadState) {
+    saveState();
+    await saveRemoteStateNow();
+  }
 }
 
 function saveState() {
@@ -135,7 +210,8 @@ function saveState() {
     temperature: temperatureInput.value,
     maxTokens: maxTokensInput.value.trim()
   };
-  localStorage.setItem(storageKey, JSON.stringify(state));
+  writeStoredState();
+  queueRemoteSave();
 }
 
 function applyTheme(theme) {
@@ -156,6 +232,11 @@ function cycleTheme() {
   const next = state.theme === "system" ? "dark" : state.theme === "dark" ? "light" : "system";
   applyTheme(next);
   saveState();
+}
+
+function syncSettingsDisclosure() {
+  if (!settingsPanel) return;
+  settingsPanel.open = !window.matchMedia("(max-width: 760px)").matches;
 }
 
 function syncRunState() {
@@ -907,6 +988,7 @@ async function sendMessage() {
     conversation.updatedAt = Date.now();
     await maybeGenerateTitle(conversation);
     saveState();
+    await saveRemoteStateNow();
     renderConversationList();
   } catch (error) {
     if (error.name === "AbortError") {
@@ -915,6 +997,7 @@ async function sendMessage() {
       updateAssistantMessage(conversationId, assistant);
       conversation.updatedAt = Date.now();
       saveState();
+      await saveRemoteStateNow();
       renderConversationList();
       return;
     }
@@ -1178,6 +1261,9 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
   if (state.theme === "system") applyTheme("system");
 });
 
+const mobileSettingsQuery = window.matchMedia("(max-width: 760px)");
+mobileSettingsQuery.addEventListener("change", syncSettingsDisclosure);
+
 // ── Auth & boot ──────────────────────────────────────────────
 const loginOverlay = document.getElementById("loginOverlay");
 const appShell    = document.getElementById("appShell");
@@ -1200,6 +1286,9 @@ function showApp(session) {
 }
 
 function showLogin() {
+  currentSession = null;
+  clearTimeout(remoteSaveTimer);
+  remoteSaveTimer = null;
   appShell.hidden = true;
   loginOverlay.hidden = false;
 }
@@ -1210,7 +1299,8 @@ async function boot() {
     const res = await fetch("/api/auth/me", { headers: { "X-Session-Token": token } });
     if (res.ok) {
       const session = await res.json();
-      loadState();
+      await hydrateSyncedState(session);
+      syncSettingsDisclosure();
       showApp(session);
       renderAll();
       syncRunState();
@@ -1246,7 +1336,8 @@ loginForm.addEventListener("submit", async (event) => {
       return;
     }
     localStorage.setItem(TOKEN_KEY, data.token);
-    loadState();
+    await hydrateSyncedState(data);
+    syncSettingsDisclosure();
     showApp(data);
     renderAll();
     syncRunState();
@@ -1259,6 +1350,7 @@ loginForm.addEventListener("submit", async (event) => {
 });
 
 logoutButton.addEventListener("click", async () => {
+  await saveRemoteStateNow();
   await fetch("/api/auth/logout", { method: "POST", headers: { "X-Session-Token": getSessionToken() } });
   localStorage.removeItem(TOKEN_KEY);
   showLogin();
@@ -1266,4 +1358,5 @@ logoutButton.addEventListener("click", async () => {
 
 adminPanelBtn.addEventListener("click", () => { location.href = "/admin.html"; });
 
+syncSettingsDisclosure();
 boot();

@@ -61,27 +61,30 @@
         </button>
         <nav class="conversation-list" id="conversationList" aria-label="Conversations"></nav>
 
-        <section class="settings" aria-label="Settings">
-          <label>
-            <span>Model</span>
-            <select id="modelSelect"></select>
-          </label>
+        <details class="settings" id="settingsPanel" open>
+          <summary>Settings</summary>
+          <div class="settings-grid">
+            <label>
+              <span>Model</span>
+              <select id="modelSelect"></select>
+            </label>
 
-          <label>
-            <span>System prompt</span>
-            <textarea id="systemInput" rows="4">You are a precise, direct, helpful AI assistant.</textarea>
-          </label>
+            <label>
+              <span>System prompt</span>
+              <textarea id="systemInput" rows="4">You are a precise, direct, helpful AI assistant.</textarea>
+            </label>
 
-          <label>
-            <span>Temperature <output id="temperatureValue">0.3</output></span>
-            <input id="temperatureInput" type="range" min="0" max="1.5" step="0.1" value="0.3" />
-          </label>
+            <label>
+              <span>Temperature <output id="temperatureValue">0.3</output></span>
+              <input id="temperatureInput" type="range" min="0" max="1.5" step="0.1" value="0.3" />
+            </label>
 
-          <label>
-            <span>Max output</span>
-            <input id="maxTokensInput" type="number" min="1" step="1" placeholder="No limit" />
-          </label>
-        </section>
+            <label>
+              <span>Max output</span>
+              <input id="maxTokensInput" type="number" min="1" step="1" placeholder="No limit" />
+            </label>
+          </div>
+        </details>
 
         <div class="sidebar-actions">
           <button id="themeButton" type="button">
