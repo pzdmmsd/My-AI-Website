@@ -4,6 +4,7 @@ const form = document.querySelector("#chatForm");
 const promptInput = document.querySelector("#promptInput");
 const modelSelect = document.querySelector("#modelSelect");
 const systemInput = document.querySelector("#systemInput");
+const colorSelect = document.querySelector("#colorSelect");
 const temperatureInput = document.querySelector("#temperatureInput");
 const temperatureValue = document.querySelector("#temperatureValue");
 const maxTokensInput = document.querySelector("#maxTokensInput");
@@ -23,6 +24,13 @@ const settingsPanel = document.querySelector("#settingsPanel");
 const appShell = document.querySelector("#appShell");
 const sidebarToggle = document.querySelector("#sidebarToggle");
 const sidebarBackdrop = document.querySelector("#sidebarBackdrop");
+const changePasswordBtn = document.querySelector("#changePasswordBtn");
+const passwordModal = document.querySelector("#passwordModal");
+const currentPasswordInput = document.querySelector("#currentPasswordInput");
+const newPasswordInput = document.querySelector("#newPasswordInput");
+const passwordModalError = document.querySelector("#passwordModalError");
+const passwordCancelBtn = document.querySelector("#passwordCancelBtn");
+const passwordSaveBtn = document.querySelector("#passwordSaveBtn");
 
 const storageKey = "nim-chat-state-v3";
 const TOKEN_KEY = "nim-session-token";
@@ -52,6 +60,7 @@ function createInitialState() {
     settings: {
       model: "",
       system: defaultSystemPrompt,
+      color: "blue",
       temperature: "0.3",
       maxTokens: ""
     },
@@ -152,6 +161,7 @@ function loadState(username = currentSession?.username) {
 
 function applyStateToControls() {
   systemInput.value = state.settings.system || defaultSystemPrompt;
+  colorSelect.value = state.settings.color || "blue";
   temperatureInput.value = state.settings.temperature;
   maxTokensInput.value = state.settings.maxTokens;
   temperatureValue.textContent = state.settings.temperature;
@@ -211,6 +221,7 @@ function saveState() {
   state.settings = {
     model: modelSelect.value,
     system: systemInput.value,
+    color: colorSelect.value,
     temperature: temperatureInput.value,
     maxTokens: maxTokensInput.value.trim()
   };
@@ -223,6 +234,7 @@ function applyTheme(theme) {
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const resolved = theme === "system" ? (prefersDark ? "dark" : "light") : theme;
   document.documentElement.dataset.theme = resolved;
+  document.documentElement.dataset.color = state.settings.color || "blue";
   themeButton.querySelector("span").textContent = theme === "dark" ? "Dark" : theme === "light" ? "Light" : "System";
   themeButton.querySelector("svg").innerHTML =
     theme === "dark"
@@ -236,6 +248,11 @@ function cycleTheme() {
   const next = state.theme === "system" ? "dark" : state.theme === "dark" ? "light" : "system";
   applyTheme(next);
   saveState();
+}
+
+function formatDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)}s`;
 }
 
 function syncSettingsDisclosure() {
@@ -604,6 +621,12 @@ function addMessage(message) {
   const metaLabel = document.createElement("span");
   metaLabel.textContent = message.role === "user" ? "You" : message.role === "assistant" ? modelName(message.model) : "Error";
   meta.append(metaLabel);
+  if (message.role === "assistant" && message.durationMs) {
+    const timing = document.createElement("span");
+    timing.className = "timing-tag";
+    timing.textContent = formatDuration(message.durationMs);
+    meta.append(timing);
+  }
   if (message.role === "user") {
     const editButton = document.createElement("button");
     editButton.type = "button";
@@ -637,12 +660,20 @@ function addMessage(message) {
   }
 
   messagesEl.append(node);
-  scrollMessagesToEnd();
   return {
     meta: node.querySelector(".message-meta"),
     body,
     node
   };
+}
+
+function scrollMessageToTop(messageId) {
+  const node = document.querySelector(`[data-message-id="${messageId}"]`);
+  if (!node) return;
+  messagesEl.scrollTo({
+    top: Math.max(0, node.offsetTop - messagesEl.offsetTop),
+    behavior: "smooth"
+  });
 }
 
 function renderMessages() {
@@ -830,6 +861,7 @@ function startEditMessage(messageId) {
     pendingFiles = [];
     saveState();
     renderAll();
+    scrollMessageToTop(messageId);
     await sendMessage();
   });
 
@@ -849,16 +881,26 @@ function cancelInlineEdit(node) {
 
 function updateAssistantMessage(conversationId, assistant) {
   if (state.activeId !== conversationId) return;
+  const node = document.querySelector(`[data-message-id="${assistant.id}"]`);
   const body = document.querySelector(`[data-message-id="${assistant.id}"] .message-body`);
   const meta = document.querySelector(`[data-message-id="${assistant.id}"] .message-meta`);
   if (!body || !meta) return;
+  node?.classList.toggle("is-streaming", !assistant.durationMs && Boolean(assistant.content));
   meta.firstElementChild.textContent = modelName(assistant.model);
+  let timing = meta.querySelector(".timing-tag");
+  if (assistant.durationMs) {
+    if (!timing) {
+      timing = document.createElement("span");
+      timing.className = "timing-tag";
+      meta.append(timing);
+    }
+    timing.textContent = formatDuration(assistant.durationMs);
+  }
   // 移除 thinking 动画（如果还在）
   const thinking = body.querySelector(".thinking-indicator");
   if (thinking) thinking.remove();
   body.innerHTML = renderMarkdown(assistant.content, assistant.sources);
   renderSources(body, assistant.sources);
-  scrollMessagesToEnd();
 }
 
 function readSseLines(chunk, buffer, onEvent) {
@@ -929,7 +971,9 @@ async function sendMessage() {
     displayContent: "",
     files: [],
     sources: [],
-    model: selectedModel
+    model: selectedModel,
+    startedAt: Date.now(),
+    durationMs: 0
   };
   conversation.messages.push(assistant);
   conversation.updatedAt = Date.now();
@@ -1004,6 +1048,8 @@ async function sendMessage() {
       updateAssistantMessage(conversationId, assistant);
     }
 
+    assistant.durationMs = Date.now() - assistant.startedAt;
+    updateAssistantMessage(conversationId, assistant);
     conversation.updatedAt = Date.now();
     await maybeGenerateTitle(conversation);
     saveState();
@@ -1011,6 +1057,7 @@ async function sendMessage() {
     renderConversationList();
   } catch (error) {
     if (error.name === "AbortError") {
+      assistant.durationMs = Date.now() - assistant.startedAt;
       assistant.content = assistant.content || "Stopped.";
       assistant.displayContent = assistant.content;
       updateAssistantMessage(conversationId, assistant);
@@ -1129,6 +1176,12 @@ for (const input of [systemInput, maxTokensInput]) {
   });
 }
 
+colorSelect.addEventListener("change", () => {
+  state.settings.color = colorSelect.value;
+  applyTheme(state.theme);
+  saveState();
+});
+
 modelSelect.addEventListener("change", () => {
   const conversation = getActiveConversation();
   conversation.model = modelSelect.value;
@@ -1175,6 +1228,7 @@ form.addEventListener("submit", async (event) => {
   autoResizePrompt();
   saveState();
   renderAll();
+  scrollMessageToTop(user.id);
   await sendMessage();
 });
 
@@ -1310,12 +1364,14 @@ function showApp(session) {
   userName.textContent = session.username;
   userRole.textContent = session.isAdmin ? "admin" : "user";
   adminPanelBtn.hidden = !session.isAdmin;
+  changePasswordBtn.hidden = Boolean(session.isAdmin);
 }
 
 function showLogin() {
   currentSession = null;
   clearTimeout(remoteSaveTimer);
   remoteSaveTimer = null;
+  closePasswordModal();
   closeSidebarDrawer();
   appShell.hidden = true;
   loginOverlay.hidden = false;
@@ -1385,6 +1441,58 @@ logoutButton.addEventListener("click", async () => {
 });
 
 adminPanelBtn.addEventListener("click", () => { location.href = "/admin.html"; });
+
+function openPasswordModal() {
+  passwordModal.classList.add("open");
+  passwordModalError.hidden = true;
+  passwordModalError.textContent = "";
+  currentPasswordInput.value = "";
+  newPasswordInput.value = "";
+  currentPasswordInput.focus();
+}
+
+function closePasswordModal() {
+  passwordModal.classList.remove("open");
+}
+
+async function changeOwnPassword() {
+  const currentPassword = currentPasswordInput.value;
+  const newPassword = newPasswordInput.value;
+  if (!currentPassword || !newPassword) {
+    passwordModalError.textContent = "Current and new password required.";
+    passwordModalError.hidden = false;
+    return;
+  }
+
+  passwordSaveBtn.disabled = true;
+  try {
+    const res = await fetch("/api/auth/password", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      passwordModalError.textContent = data.error || "Password change failed.";
+      passwordModalError.hidden = false;
+      return;
+    }
+
+    await fetch("/api/auth/logout", { method: "POST", headers: { "X-Session-Token": getSessionToken() } });
+    localStorage.removeItem(TOKEN_KEY);
+    closePasswordModal();
+    showLogin();
+  } finally {
+    passwordSaveBtn.disabled = false;
+  }
+}
+
+changePasswordBtn.addEventListener("click", openPasswordModal);
+passwordCancelBtn.addEventListener("click", closePasswordModal);
+passwordSaveBtn.addEventListener("click", changeOwnPassword);
+passwordModal.addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) closePasswordModal();
+});
 
 syncSettingsDisclosure();
 setSidebarDrawer(sidebarPinnedOpen);
