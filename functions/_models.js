@@ -1,9 +1,9 @@
 const DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1";
-const DEFAULT_MODEL = "google/gemma-4-31b-it";
+const DEFAULT_MODEL = "openai/gpt-oss-120b";
 const CACHE_TTL_SECONDS = 60 * 60 * 6;
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 
-export const fallbackModels = ["google/gemma-4-31b-it"];
+export const fallbackModels = ["openai/gpt-oss-120b"];
 
 const excludePatterns = [
   /embed/i,

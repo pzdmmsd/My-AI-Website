@@ -37,7 +37,7 @@ const storageKey = "nim-chat-state-v3";
 const TOKEN_KEY = "nim-session-token";
 const maxFileBytes = 180 * 1024;
 const defaultSystemPrompt = "You are a precise, direct, helpful AI assistant.";
-const fallbackModels = ["google/gemma-4-31b-it"];
+const fallbackModels = ["openai/gpt-oss-120b"];
 
 function getSessionToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
 function authHeaders() {

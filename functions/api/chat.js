@@ -2,7 +2,7 @@ import { hasSearchConfig, sourcesToPrompt, webSearch } from "../_search.js";
 import { requireAuth } from "../_auth.js";
 
 const DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1";
-const DEFAULT_MODEL = "google/gemma-4-31b-it";
+const DEFAULT_MODEL = "openai/gpt-oss-120b";
 
 const jsonHeaders = {
   "Content-Type": "application/json; charset=utf-8",

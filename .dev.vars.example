@@ -1,6 +1,6 @@
 NVIDIA_API_KEY=your_nvidia_nim_api_key
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
-NVIDIA_MODEL=google/gemma-4-31b-it
+NVIDIA_MODEL=openai/gpt-oss-120b
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=change_this_password
 SEARCH_PROVIDER=tavily

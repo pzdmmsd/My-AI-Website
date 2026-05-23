@@ -31,7 +31,14 @@ export async function onRequestGet(context) {
     if (shouldRefresh(cached)) {
       context.waitUntil(refreshModelCache(request, env));
     }
-    return json({ ...cached, refreshing: shouldRefresh(cached) });
+    const preferredDefault = defaultModel(env);
+    const models = cached.models?.length ? cached.models : fallbackModels;
+    return json({
+      ...cached,
+      models,
+      default_model: models.includes(preferredDefault) ? preferredDefault : cached.default_model || models[0] || preferredDefault,
+      refreshing: shouldRefresh(cached)
+    });
   }
 
   if (forceRefresh) {

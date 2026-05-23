@@ -68,7 +68,7 @@ functions/
    ```env
    NVIDIA_API_KEY=your_nvidia_nim_api_key
    NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
-   NVIDIA_MODEL=google/gemma-4-31b-it
+   NVIDIA_MODEL=openai/gpt-oss-120b
    ADMIN_USERNAME=admin
    ADMIN_PASSWORD=change_this_password
    SEARCH_PROVIDER=tavily
@@ -94,7 +94,7 @@ pages_build_output_dir = "public"
 
 [vars]
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
-NVIDIA_MODEL = "google/gemma-4-31b-it"
+NVIDIA_MODEL = "openai/gpt-oss-120b"
 
 [[kv_namespaces]]
 binding = "CHAT_KV"
@@ -133,7 +133,7 @@ npm run deploy
 | --- | --- | --- |
 | `NVIDIA_API_KEY` | 是 | NVIDIA NIM API Key |
 | `NVIDIA_BASE_URL` | 否 | NVIDIA API Base URL，默认 `https://integrate.api.nvidia.com/v1` |
-| `NVIDIA_MODEL` | 否 | 默认模型，当前默认 `google/gemma-4-31b-it` |
+| `NVIDIA_MODEL` | 否 | 默认模型，当前默认 `openai/gpt-oss-120b` |
 | `ADMIN_USERNAME` | 是 | 管理员用户名 |
 | `ADMIN_PASSWORD` | 是 | 管理员密码 |
 | `SEARCH_PROVIDER` | 否 | 联网搜索提供方，可用 `tavily` 或 `brave` |
