@@ -1524,6 +1524,14 @@ passwordModal.addEventListener("click", (event) => {
   if (event.target === event.currentTarget) closePasswordModal();
 });
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // Installation support is optional; the app still works without a service worker.
+    });
+  });
+}
+
 syncSettingsDisclosure();
 setSidebarDrawer(sidebarPinnedOpen);
 boot();

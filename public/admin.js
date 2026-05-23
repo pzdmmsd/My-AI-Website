@@ -297,5 +297,13 @@ window.addEventListener("storage", (event) => {
   }
 });
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // Installation support is optional; admin tools still work without it.
+    });
+  });
+}
+
 applyStoredTheme();
 boot();
